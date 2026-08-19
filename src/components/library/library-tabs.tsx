@@ -139,7 +139,7 @@ export function LibraryTabs({
           ) : (
             <div className="flex flex-wrap gap-3">
               {genres.map((genre) => (
-                <GenreCard key={genre.id} genre={genre} />
+                <GenreCard key={genre.id} genre={genre} className="w-40 md:w-44" />
               ))}
             </div>
           )}

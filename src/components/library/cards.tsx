@@ -68,7 +68,7 @@ const GENRE_GRADIENTS = [
   'from-sky-400 to-cyan-600',
 ]
 
-function genreGradient(genreId: string): string {
+export function genreGradient(genreId: string): string {
   let hash = 0
   for (const ch of genreId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
   return GENRE_GRADIENTS[Math.abs(hash) % GENRE_GRADIENTS.length]
@@ -78,7 +78,7 @@ export function GenreCard({ genre, className }: { genre: Genre; className?: stri
   return (
     <Link
       href={`/genre/${genre.id}`}
-      className={`group relative flex h-28 w-40 shrink-0 flex-col justify-between overflow-hidden rounded-xl bg-gradient-to-br p-3 text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5 md:w-44 ${genreGradient(genre.id)} ${className ?? ''}`}
+      className={`group relative flex h-28 shrink-0 flex-col justify-between overflow-hidden rounded-xl bg-gradient-to-br p-3 text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5 ${genreGradient(genre.id)} ${className ?? ''}`}
     >
       <span className="text-base font-bold drop-shadow-sm">{genre.name}</span>
       <span className="text-xs font-medium text-white/80">

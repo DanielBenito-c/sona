@@ -34,6 +34,8 @@ export type TrackRow = Track & {
   album: Album | null
 }
 
+export { TRACK_SELECT }
+
 // Convierte una fila cruda del select a TrackRow normalizando el embed de
 // track_artists ({position, artist}) en una lista de artistas ordenada.
 function toTrackRow(raw: Record<string, unknown>): TrackRow {
@@ -51,7 +53,7 @@ function toTrackRow(raw: Record<string, unknown>): TrackRow {
   }
 }
 
-function rows(data: readonly unknown[] | null | undefined): TrackRow[] {
+export function rows(data: readonly unknown[] | null | undefined): TrackRow[] {
   return (data ?? []).map((d) => toTrackRow(d as Record<string, unknown>))
 }
 
