@@ -257,13 +257,13 @@ export default function AdminUploadPage() {
           <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-400">
             {stats.errors} con error
           </span>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex w-full gap-2 md:w-auto">
             {stats.queued > 0 && (
               <button
                 type="button"
                 onClick={startQueue}
                 disabled={processing}
-                className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="flex-1 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50 md:flex-none"
               >
                 {processing ? 'Importando…' : `Importar ${stats.queued} canción${stats.queued > 1 ? 'es' : ''}`}
               </button>
@@ -271,7 +271,7 @@ export default function AdminUploadPage() {
             <button
               type="button"
               onClick={clearFinished}
-              className="rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-foreground"
+              className="flex-1 rounded-xl border border-border px-4 py-2 text-sm text-muted hover:text-foreground md:flex-none"
             >
               Limpiar terminadas
             </button>

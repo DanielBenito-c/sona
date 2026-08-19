@@ -75,6 +75,8 @@ export function DropdownMenu({ trigger, triggerLabel, items, align = 'end' }: Pr
       item.disabled && 'pointer-events-none opacity-40'
     )
 
+  const openUp = Boolean(open && rect && window.innerHeight - rect.bottom < 280)
+
   return (
     <>
       <button
@@ -94,7 +96,9 @@ export function DropdownMenu({ trigger, triggerLabel, items, align = 'end' }: Pr
           role="menu"
           className="fixed z-50 max-h-[60dvh] min-w-52 overflow-y-auto rounded-xl border border-border bg-surface/95 p-1.5 shadow-xl shadow-black/50 backdrop-blur"
           style={{
-            top: rect.bottom + 6,
+            ...(openUp
+              ? { bottom: window.innerHeight - rect.top + 6 }
+              : { top: rect.bottom + 6 }),
             ...(align === 'end'
               ? { right: window.innerWidth - rect.right }
               : { left: rect.left }),

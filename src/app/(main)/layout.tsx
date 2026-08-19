@@ -30,7 +30,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           <PlayerBar />
         </div>
 
-        <BottomNav />
+        <BottomNav profile={user.profile} />
       </div>
     </PlayerProvider>
   )
