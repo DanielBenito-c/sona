@@ -1,0 +1,138 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { Disc3, Heart, Library as LibraryIcon, Mic2, Music2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { TrackListPaginated } from './track-list-paginated'
+import { AlbumCard, ArtistCard } from './cards'
+import { TrackList } from './track-list'
+import { EmptyState } from '@/components/ui/spinner'
+import type { LibraryTrack } from './track-row'
+import type { Album, Artist } from '@/types/music'
+
+const TABS = [
+  { id: 'tracks', label: 'Canciones', icon: Music2 },
+  { id: 'albums', label: 'Álbumes', icon: Disc3 },
+  { id: 'artists', label: 'Artistas', icon: Mic2 },
+  { id: 'favorites', label: 'Favoritas', icon: Heart },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+
+interface Props {
+  userId: string
+  initialTracks: LibraryTrack[]
+  initialCursor: string | null
+  favoriteIds: Set<string>
+  albums: Album[]
+  artists: Artist[]
+  favoriteTracks: LibraryTrack[]
+}
+
+export function LibraryTabs({
+  initialTracks,
+  initialCursor,
+  favoriteIds,
+  albums,
+  artists,
+  favoriteTracks,
+}: Props) {
+  const [tab, setTab] = useState<TabId>('tracks')
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex gap-1 overflow-x-auto">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              'flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
+              tab === id
+                ? 'bg-gradient-brand text-white'
+                : 'text-muted hover:bg-surface-hover hover:text-foreground'
+            )}
+          >
+            <Icon aria-hidden className="size-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'tracks' && (
+        <TrackListPaginated
+          initialTracks={initialTracks}
+          initialCursor={initialCursor}
+          favoriteIds={favoriteIds}
+          fetchUrl="/api/search?q=&limit=60"
+          context={{ type: 'queue', title: 'Tu biblioteca' }}
+          emptyMessage="Aún no hay canciones en la biblioteca."
+        />
+      )}
+
+      {tab === 'albums' && (
+        <>
+          {albums.length === 0 ? (
+            <EmptyState
+              icon={<LibraryIcon className="size-10" />}
+              title="Sin álbumes"
+              description="Los álbumes aparecerán aquí cuando se suban canciones con etiquetas de álbum."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {albums.map((album) => (
+                <AlbumCard key={album.id} album={album} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'artists' && (
+        <>
+          {artists.length === 0 ? (
+            <EmptyState
+              icon={<Mic2 className="size-10" />}
+              title="Sin artistas"
+              description="Los artistas se crean automáticamente al subir canciones."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {artists.map((artist) => (
+                <ArtistCard key={artist.id} artist={artist} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'favorites' && (
+        <>
+          {favoriteTracks.length === 0 ? (
+            <EmptyState
+              icon={<Heart className="size-10" />}
+              title="Sin favoritas todavía"
+              description="Toca el corazón en cualquier canción para guardarla aquí."
+            />
+          ) : (
+            <div className="flex flex-col gap-1">
+              <TrackList
+                tracks={favoriteTracks}
+                favoriteIds={new Set(favoriteTracks.map((t) => t.id))}
+                context={{ type: 'favorites', title: 'Tus favoritas' }}
+              />
+              <p className="mt-2 text-xs text-muted">
+                <Link href="/search" className="text-accent hover:underline">
+                  Buscar canciones
+                </Link>{' '}
+                para añadir más favoritas.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

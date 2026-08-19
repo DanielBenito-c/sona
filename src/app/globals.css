@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Identidad visual de Sona
+   Tema oscuro por defecto, acento degradado violeta → fucsia
+   ============================================================ */
+
+:root {
+  --background: #0b0a10;
+  --surface: #14131b;
+  --surface-hover: #1d1b27;
+  --border: #26242f;
+  --foreground: #f4f2ff;
+  --muted: #a09cab;
+  --accent: #8b5cf6;
+  --accent-2: #d946ef;
+  --player-height: 72px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* iOS: respetar notch / Dynamic Island / home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Gradiente de marca */
+.text-gradient {
+  background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-gradient-brand {
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+}
+
+/* Scrollbar discreto (desktop) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Rango (slider de volumen/progreso) */
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+@keyframes sona-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: sona-spin 4s linear infinite;
+}
