@@ -6,6 +6,7 @@ import { Cover } from '@/components/library/cover'
 import { AlbumCard } from '@/components/library/cards'
 import { SectionHeader } from '@/components/library/section-header'
 import { TrackList } from '@/components/library/track-list'
+import { BackButton } from '@/components/ui/back-button'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -31,6 +32,7 @@ export default async function ArtistPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-7">
+      <BackButton href="/library" />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
         <Cover
           src={artist.image_url}

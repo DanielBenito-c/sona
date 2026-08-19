@@ -6,6 +6,7 @@ import { formatTotalDuration } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { Cover } from '@/components/library/cover'
 import { PlaylistClient } from '@/components/playlist/playlist-client'
+import { BackButton } from '@/components/ui/back-button'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -36,6 +37,7 @@ export default async function PlaylistPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackButton href="/library" />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
         <Cover
           src={playlist.cover_url}

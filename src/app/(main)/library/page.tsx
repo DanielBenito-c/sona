@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 import { requireUser } from '@/lib/auth'
 import {
+  getAlbums,
   getArtists,
   getFavoriteTracks,
   getGenres,
-  getNewAlbums,
   getUserPlaylists,
   searchLibrary,
 } from '@/lib/library'
@@ -19,7 +19,7 @@ export default async function LibraryPage() {
 
   const [tracks, albums, artists, favorites, playlists, genres] = await Promise.all([
     searchLibrary(user.id, '', null, 60),
-    getNewAlbums(100),
+    getAlbums(100),
     getArtists(100),
     getFavoriteTracks(user.id, 100),
     getUserPlaylists(user.id),

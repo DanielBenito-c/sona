@@ -74,12 +74,25 @@ export default function AdminUploadPage() {
       return
     }
 
-    // --- 1. Hash para detectar duplicados --------------------------------
-    updateItem(item.id, { status: 'importing', message: 'Calculando hash…' })
+    // --- 1. Hash + comprobación de duplicados ----------------------------
+    updateItem(item.id, { status: 'importing', message: 'Comprobando duplicados…' })
     const buffer = await item.file.arrayBuffer()
     const hash = await sha256(buffer)
     const ext = item.file.name.split('.').pop()!.toLowerCase()
     const path = `tracks/${crypto.randomUUID()}.${ext}`
+
+    // Si el fichero ya está (mismo hash), se descarta sin subir nada.
+    const pre = await fetch('/api/admin/check-duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha256: hash }),
+    })
+      .then((r) => r.json())
+      .catch(() => null)
+    if (pre?.duplicate) {
+      updateItem(item.id, { status: 'duplicate', progress: 100, message: pre.message })
+      return
+    }
 
     // --- 2. Subida directa a storage (XHR → progreso y cancelar) ---------
     const xhr = new XMLHttpRequest()

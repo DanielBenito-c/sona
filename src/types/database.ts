@@ -64,6 +64,7 @@ export type TrackRow = {
   audio_path: string
   cover_url: string | null
   search_text: string | null
+  title_norm: string | null
   lyrics: string | null
   custom_metadata: Record<string, unknown>
   plays_count: number

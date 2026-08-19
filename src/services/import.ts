@@ -27,6 +27,15 @@ const MAX_SIZE = 100 * 1024 * 1024 // 100 MB (coincide con el bucket)
 
 type AdminClient = SupabaseClient<Database>
 
+// Normaliza un título/artista para comparar duplicados: minúsculas, sin
+// acentos y solo [a-z0-9 ] (equivalente al SQL de migración 0007).
+const ACCENT_MAP: Record<string, string> = { á: 'a', é: 'e', í: 'i', ó: 'o', ú: 'u', ü: 'u', ñ: 'n' }
+
+export function normalizeTitle(raw: string): string {
+  const folded = raw.toLowerCase().replace(/[áéíóúüñ]/g, (ch) => ACCENT_MAP[ch] ?? ch)
+  return folded.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 // Separa un campo de artista con varios nombres ("Flo Rida, T-pain",
 // "Shakira feat. Anuel AA", "Lil Nas X (feat. Billy Ray Cyrus)").
 // Conservadores con "/" y "+" para no romper bandas tipo "AC/DC".
@@ -102,6 +111,11 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
     }
   }
 
+  // ¿Existe la columna title_norm (migración 0007)? Sin ella se salta el
+  // chequeo por título+artista y solo actúa el de hash.
+  const probe = await admin.from('tracks').select('title_norm').limit(1)
+  const hasTitleNorm = !probe.error
+
   // --- 2. Descargar y extraer metadatos --------------------------------
   const { data: fileBlob, error: dlError } = await admin.storage.from(BUCKETS.audio).download(req.path)
   if (dlError || !fileBlob) {
@@ -139,6 +153,49 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
 
   const cover = common.picture?.[0]
 
+  // Varios artistas posibles ("Flo Rida, T-pain" → Flo Rida + T-pain).
+  // El primero es el principal (tracks.artist_id); el resto se enlaza
+  // vía track_artists. Se calculan antes para el chequeo de duplicados.
+  const artistNames = splitArtistNames(artistName)
+
+  // --- 2b. Duplicados por título + artistas -------------------------------
+  // Misma canción con otro fichero (re-encode, distinto hash): se compara
+  // el título normalizado y que al menos un artista coincida.
+  const titleNorm = hasTitleNorm ? normalizeTitle(title) : ''
+  if (hasTitleNorm && titleNorm) {
+    const { data: candidates } = await admin
+      .from('tracks')
+      .select('id, title, artist_id, artists:track_artists(artist_id)')
+      .eq('title_norm', titleNorm)
+      .limit(25)
+    if (candidates && candidates.length > 0) {
+      const ids = new Set<string>()
+      for (const c of candidates) {
+        ids.add(c.artist_id)
+        for (const a of c.artists ?? []) ids.add(a.artist_id)
+      }
+      const { data: artistRows } = await admin
+        .from('artists')
+        .select('id, name')
+        .in('id', [...ids])
+      const nameById = new Map((artistRows ?? []).map((a) => [a.id, a.name]))
+      const parsedNorms = new Set(artistNames.map((n) => normalizeTitle(n)))
+      const dup = candidates.find((c) =>
+        [c.artist_id, ...(c.artists ?? []).map((a) => a.artist_id)]
+          .map((id) => nameById.get(id))
+          .some((name) => name && parsedNorms.has(normalizeTitle(name)))
+      )
+      if (dup) {
+        await storage.delete(BUCKETS.audio, req.path).catch(() => undefined)
+        return {
+          ok: false,
+          status: 'duplicate',
+          message: `Ya existe: «${dup.title}» (mismo título y artista)`,
+        }
+      }
+    }
+  }
+
   // --- 3. Buscar o crear genre / artists / album ---------------------------
   let genreId: string | null = null
   if (genreName) {
@@ -151,10 +208,6 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
     genreId = row?.id ?? null
   }
 
-  // Varios artistas posibles ("Flo Rida, T-pain" → Flo Rida + T-pain).
-  // El primero es el principal (tracks.artist_id); el resto se enlaza
-  // vía track_artists.
-  const artistNames = splitArtistNames(artistName)
   const artistIds: string[] = []
   for (const name of artistNames) {
     const { row: a, error: aErr } = await findOrCreate<{ id: string }>(
@@ -222,6 +275,7 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
       audio_path: req.path,
       cover_url: albumCover,
       search_text: [title, allArtistNames, albumTitle].filter(Boolean).join(' ').toLowerCase(),
+      title_norm: titleNorm || null,
       custom_metadata: {
         file_sha256: req.sha256.toLowerCase(),
         filename: req.filename,

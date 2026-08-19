@@ -6,6 +6,7 @@ import { getAlbumDetail, getFavoriteTrackIds } from '@/lib/library'
 import { formatTotalDuration } from '@/lib/utils'
 import { Cover } from '@/components/library/cover'
 import { TrackList } from '@/components/library/track-list'
+import { BackButton } from '@/components/ui/back-button'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -32,6 +33,7 @@ export default async function AlbumPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackButton href="/library" />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
         <Cover
           src={album.cover_url}

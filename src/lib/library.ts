@@ -4,19 +4,33 @@ import type { Album, Artist, EmbeddedArtist, Genre, Playlist, Track } from '@/ty
 import { isValidUUID } from '@/lib/utils'
 
 interface CursorPos {
-  addedAt: string
+  addedAt?: string
+  title?: string
   id: string
 }
 
+// Cursor keyset con prefijo de ordenación: "a" = added_at, "t" = título.
 export function encodeCursor(addedAt: string | null, id: string): string {
-  return Buffer.from(`${addedAt ?? ''}|${id}`).toString('base64url')
+  return Buffer.from(`a:${addedAt ?? ''}|${id}`).toString('base64url')
+}
+
+export function encodeTitleCursor(title: string, id: string): string {
+  return Buffer.from(`t:${title}|${id}`).toString('base64url')
 }
 
 export function decodeCursor(cursor: string): CursorPos | null {
   try {
-    const [addedAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split('|')
+    const raw = Buffer.from(cursor, 'base64url').toString('utf8')
+    const sep = raw.indexOf(':')
+    if (sep < 1) return null
+    const kind = raw.slice(0, sep)
+    const [value, id] = raw.slice(sep + 1).split('|')
     if (!id || !isValidUUID(id)) return null
-    return { addedAt, id }
+    return kind === 't'
+      ? { title: value, id }
+      : kind === 'a'
+        ? { addedAt: value, id }
+        : null
   } catch {
     return null
   }
@@ -97,7 +111,9 @@ export async function getFavoriteTracks(userId: string, limit = 100): Promise<Tr
     .eq('item_type', 'track')
     .order('created_at', { ascending: false })
     .limit(limit)
-  return resolveTrackItems(userId, (data ?? []).map((r) => r.item_id))
+  const tracks = await resolveTrackItems(userId, (data ?? []).map((r) => r.item_id))
+  tracks.sort((a, b) => a.title.localeCompare(b.title, 'es'))
+  return tracks
 }
 
 // Ids de tracks favoritos del usuario (para marcar corazones).
@@ -144,6 +160,18 @@ export async function getNewAlbums(limit = 12): Promise<Album[]> {
   return (data ?? []) as Album[]
 }
 
+// Álbumes ordenados alfabéticamente (pestaña Álbumes de la biblioteca).
+export async function getAlbums(limit = 100): Promise<Album[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('albums')
+    .select('id, title, artist_id, release_year, cover_url, created_at, artist:artist_id(name)')
+    .order('title', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(limit)
+  return (data ?? []) as Album[]
+}
+
 export async function getAlbumsByArtist(artistId: string): Promise<Album[]> {
   const supabase = await createClient()
   const { data } = await supabase
@@ -160,6 +188,7 @@ export async function getArtists(limit = 12): Promise<Artist[]> {
   const { data } = await supabase
     .from('artists')
     .select('id, name, image_url, bio, created_at')
+    .order('name', { ascending: true })
     .order('created_at', { ascending: true })
     .limit(limit)
   return (data ?? []) as Artist[]
@@ -243,6 +272,7 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
       'id, owner_id, name, description, cover_url, is_public, created_at, updated_at, tracks:playlist_tracks(track:track_id(duration_ms))'
     )
     .eq('owner_id', userId)
+    .order('name', { ascending: true })
     .order('created_at', { ascending: false })
   return (data ?? []).map((p) => {
     const tracks = (p.tracks ?? []) as { track: { duration_ms: number } | null }[]
@@ -365,18 +395,31 @@ export async function searchLibrary(
 
   type BuilderResult = { data: readonly unknown[] | null; error: { message: string } | null }
 
-  async function fetchTracks(builder: PromiseLike<BuilderResult>) {
+  async function fetchTracks(
+    builder: PromiseLike<BuilderResult>,
+    cursorKind: 'addedAt' | 'title'
+  ) {
     const { data, error } = await builder
     tracks = rows(data)
     if (tracks.length === clamped) {
       const last = tracks[tracks.length - 1]
-      nextCursor = encodeCursor(last.added_at ?? '', last.id)
+      nextCursor =
+        cursorKind === 'title'
+          ? encodeTitleCursor(last.title, last.id)
+          : encodeCursor(last.added_at ?? '', last.id)
     }
     return { data, error }
   }
 
+  // PostgREST exige paréntesis en or=(...) y no admite rutas embebidas
+  // (p. ej. artist_id.name) dentro del or(); por eso se busca sobre la
+  // columna denormalizada search_text (migración 0004). Los valores se
+  // entrecomillan para títulos con comas/puntos/paréntesis.
+  const quoted = (s: string) => `"${s.replaceAll('"', '""')}"`
   const keysetOr = (pos: CursorPos) =>
-    `or(and(added_at.lt.${pos.addedAt}),and(added_at.eq.${pos.addedAt},id.lt.${pos.id}))`
+    `or(and(added_at.lt.${quoted(pos.addedAt ?? '')}),and(added_at.eq.${quoted(pos.addedAt ?? '')},id.lt.${quoted(pos.id)}))`
+  const titleKeysetOr = (pos: CursorPos) =>
+    `or(and(title.gt.${quoted(pos.title ?? '')}),and(title.eq.${quoted(pos.title ?? '')},id.gt.${quoted(pos.id)}))`
 
   if (q.length >= 2) {
     // Nota: PostgREST exige paréntesis en or=(...) y no admite rutas
@@ -392,7 +435,7 @@ export async function searchLibrary(
       .limit(clamped)
     if (pos) builder = builder.or(keysetOr(pos))
 
-    const { error } = await fetchTracks(builder)
+    const { error } = await fetchTracks(builder, 'addedAt')
 
     if (error && tracks.length === 0) {
       // search_text no existe todavía (0004 sin aplicar): se degrada a
@@ -405,19 +448,19 @@ export async function searchLibrary(
         .order('id', { ascending: false })
         .limit(clamped)
       if (pos) fallback = fallback.or(keysetOr(pos))
-      await fetchTracks(fallback)
+      await fetchTracks(fallback, 'addedAt')
     }
   } else {
-    // Sin consulta: todo el catálogo (biblioteca).
+    // Sin consulta: todo el catálogo (biblioteca), ordenado alfabéticamente.
     const pos = cursor ? decodeCursor(cursor) : null
     let builder = supabase
       .from('tracks')
       .select(TRACK_SELECT)
-      .order('added_at', { ascending: false })
-      .order('id', { ascending: false })
+      .order('title', { ascending: true })
+      .order('id', { ascending: true })
       .limit(clamped)
-    if (pos) builder = builder.or(keysetOr(pos))
-    await fetchTracks(builder)
+    if (pos) builder = builder.or(titleKeysetOr(pos))
+    await fetchTracks(builder, 'title')
   }
 
   const results = await Promise.all([

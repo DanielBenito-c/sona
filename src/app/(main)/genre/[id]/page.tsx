@@ -7,6 +7,7 @@ import { AlbumCard } from '@/components/library/cards'
 import { TrackList } from '@/components/library/track-list'
 import { SectionHeader } from '@/components/library/section-header'
 import { GenrePlayButton } from '@/components/genre/genre-play-button'
+import { BackButton } from '@/components/ui/back-button'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -32,6 +33,7 @@ export default async function GenrePage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackButton href="/library" />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
         <div className="bg-gradient-to-br from-violet-500 to-purple-700 flex size-40 items-center justify-center rounded-2xl text-white shadow-lg shadow-black/20 md:size-56">
           <Music2 aria-hidden className="size-20 opacity-90" />

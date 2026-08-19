@@ -19,7 +19,7 @@ export function PlayerBar() {
   return (
     <>
       <div className="mb-14 shrink-0 md:mb-0">
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/80 backdrop-blur md:bottom-0">
+        <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-surface/80 backdrop-blur md:bottom-0">
           {hasTrack && (
             <div
               aria-hidden
