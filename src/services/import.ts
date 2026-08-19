@@ -2,6 +2,7 @@ import 'server-only'
 import { parseBuffer } from 'music-metadata'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAdminClient } from '@/lib/supabase/admin'
+import { genreForTrack } from '@/lib/genre-mapping'
 import { BUCKETS, getStorageProvider } from '@/lib/storage'
 import { formatBytes } from '@/lib/utils'
 import type { Database } from '@/types/database'
@@ -123,7 +124,13 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
   const manualArtist = req.artist?.trim()
   const artistName = clean(manualArtist || common.artist || common.albumartist) || 'Artista desconocido'
   const albumTitle = clean(common.album)
-  const genreName = clean(common.genre?.[0])
+  // Género: la etiqueta del archivo tiene prioridad; si no la trae, se
+  // asigna automáticamente por título/artista (genre-mapping).
+  const genreName = genreForTrack({
+    title,
+    artistName,
+    tagGenre: clean(common.genre?.[0]) || null,
+  })
   const trackNo = common.track?.no ?? null
   const discNo = common.disk?.no ?? null
   const year = common.year ?? null

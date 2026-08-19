@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Music2 } from 'lucide-react'
 import { Cover } from './cover'
 import type { Album, Artist, Genre } from '@/types/music'
 
@@ -44,8 +45,49 @@ export function ArtistCard({ artist }: { artist: Artist }) {
 
 export function GenreChip({ genre, className }: { genre: Genre; className?: string }) {
   return (
-    <span className={`rounded-full bg-surface-hover px-3.5 py-1.5 text-sm font-medium ${className ?? ''}`}>
+    <Link
+      href={`/genre/${genre.id}`}
+      className={`rounded-full bg-surface-hover px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-accent/20 hover:text-accent ${className ?? ''}`}
+    >
       {genre.name}
-    </span>
+    </Link>
+  )
+}
+
+// Degradados deterministas por id de género (estilo Spotify).
+const GENRE_GRADIENTS = [
+  'from-pink-500 to-rose-600',
+  'from-violet-500 to-purple-700',
+  'from-blue-500 to-indigo-600',
+  'from-emerald-500 to-teal-600',
+  'from-orange-400 to-red-500',
+  'from-cyan-400 to-blue-500',
+  'from-fuchsia-500 to-pink-600',
+  'from-amber-400 to-orange-500',
+  'from-lime-500 to-green-600',
+  'from-sky-400 to-cyan-600',
+]
+
+function genreGradient(genreId: string): string {
+  let hash = 0
+  for (const ch of genreId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  return GENRE_GRADIENTS[Math.abs(hash) % GENRE_GRADIENTS.length]
+}
+
+export function GenreCard({ genre, className }: { genre: Genre; className?: string }) {
+  return (
+    <Link
+      href={`/genre/${genre.id}`}
+      className={`group relative flex h-28 w-40 shrink-0 flex-col justify-between overflow-hidden rounded-xl bg-gradient-to-br p-3 text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5 md:w-44 ${genreGradient(genre.id)} ${className ?? ''}`}
+    >
+      <span className="text-base font-bold drop-shadow-sm">{genre.name}</span>
+      <span className="text-xs font-medium text-white/80">
+        {genre.track_count ?? 0} canciones
+      </span>
+      <Music2
+        aria-hidden
+        className="absolute -right-2 -bottom-2 size-16 rotate-12 text-white/25 transition-transform group-hover:rotate-6 group-hover:scale-110"
+      />
+    </Link>
   )
 }

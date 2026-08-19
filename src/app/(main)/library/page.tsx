@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth'
 import {
   getArtists,
   getFavoriteTracks,
+  getGenres,
   getNewAlbums,
   getUserPlaylists,
   searchLibrary,
@@ -16,12 +17,13 @@ export const metadata: Metadata = {
 export default async function LibraryPage() {
   const user = await requireUser()
 
-  const [tracks, albums, artists, favorites, playlists] = await Promise.all([
+  const [tracks, albums, artists, favorites, playlists, genres] = await Promise.all([
     searchLibrary(user.id, '', null, 60),
     getNewAlbums(100),
     getArtists(100),
     getFavoriteTracks(user.id, 100),
     getUserPlaylists(user.id),
+    getGenres(),
   ])
 
   return (
@@ -37,6 +39,7 @@ export default async function LibraryPage() {
         favoriteIds={new Set(favorites.map((t) => t.id))}
         albums={albums}
         artists={artists}
+        genres={genres}
         favoriteTracks={favorites}
         playlists={playlists}
       />

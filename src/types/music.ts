@@ -14,6 +14,8 @@ export interface Artist {
 export interface Genre {
   id: string
   name: string
+  /** Número de canciones del género (para tarjetas y cabeceras). */
+  track_count?: number
 }
 
 export interface Album {

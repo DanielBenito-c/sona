@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Heart, ListX, Loader2, Pause, Play } from 'lucide-react'
+import { Album as AlbumIcon, Heart, ListPlus, ListX, Loader2, Mic2, MoreHorizontal, Pause, Play } from 'lucide-react'
 import { getBrowserClient } from '@/lib/supabase/client'
 import { usePlayer } from '@/contexts/player-provider'
 import { cn, formatArtists, formatDuration } from '@/lib/utils'
+import { DropdownMenu, type MenuItem } from '@/components/ui/dropdown-menu'
+import { AddToPlaylistDialog } from '@/components/playlist/add-to-playlist-dialog'
 import { Cover } from './cover'
 import type { Album, Artist, Track } from '@/types/music'
 import type { QueueContext } from '@/types/player'
@@ -39,6 +41,7 @@ export function TrackRow({
   const [fav, setFav] = useState(isFavorite)
   const [busy, setBusy] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [addToListOpen, setAddToListOpen] = useState(false)
   const player = usePlayer()
   const isCurrent = player.current?.id === track.id
   const isCurrentPlaying = isCurrent && player.isPlaying
@@ -50,9 +53,12 @@ export function TrackRow({
     const next = !fav
     // Optimista; si falla, se revierte.
     setFav(next)
-    const { error } = next
-      ? await supabase.from('favorites').insert({ item_type: 'track', item_id: track.id })
-      : await supabase.from('favorites').delete().eq('item_type', 'track').eq('item_id', track.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = user
+      ? next
+        ? await supabase.from('favorites').insert({ user_id: user.id, item_type: 'track', item_id: track.id })
+        : await supabase.from('favorites').delete().eq('user_id', user.id).eq('item_type', 'track').eq('item_id', track.id)
+      : { error: new Error('sin sesión') }
     if (error) setFav(!next)
     setBusy(false)
     onToggleFavorite?.(track.id, next)
@@ -67,6 +73,51 @@ export function TrackRow({
       player.playTrack(track, context)
     }
   }
+
+  const menuItems: MenuItem[] = [
+    {
+      label: 'Añadir a lista',
+      icon: <ListPlus aria-hidden className="size-4" />,
+      onSelect: () => setAddToListOpen(true),
+    },
+    {
+      label: fav ? 'Quitar de favoritas' : 'Añadir a favoritas',
+      icon: <Heart aria-hidden className={cn('size-4', fav && 'fill-current')} />,
+      onSelect: () => void toggleFavorite(),
+    },
+    ...(track.album_id
+      ? [
+          {
+            label: 'Ir al álbum',
+            icon: <AlbumIcon aria-hidden className="size-4" />,
+            href: `/album/${track.album_id}`,
+          },
+        ]
+      : []),
+    ...(track.artist?.id || track.artists?.[0]?.id
+      ? [
+          {
+            label: 'Ir al artista',
+            icon: <Mic2 aria-hidden className="size-4" />,
+            href: `/artist/${track.artist?.id ?? track.artists?.[0]?.id}`,
+          },
+        ]
+      : []),
+    ...(onRemove
+      ? [
+          {
+            label: 'Quitar de esta lista',
+            icon: <ListX aria-hidden className="size-4" />,
+            danger: true,
+            disabled: removing,
+            onSelect: () => {
+              setRemoving(true)
+              onRemove(track.id)
+            },
+          },
+        ]
+      : []),
+  ]
 
   return (
     <div className="group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-surface-hover/60">
@@ -132,23 +183,13 @@ export function TrackRow({
           className={cn('size-4 transition-colors', fav && 'fill-accent text-accent')}
         />
       </button>
-      {onRemove && (
-        <button
-          type="button"
-          onClick={() => {
-            setRemoving(true)
-            onRemove(track.id)
-          }}
-          disabled={removing}
-          aria-label={`Quitar ${track.title} de la lista`}
-          className="rounded-full p-2 text-muted transition-colors hover:text-foreground disabled:opacity-40"
-        >
-          {removing ? (
-            <Loader2 aria-hidden className="size-4 animate-spin" />
-          ) : (
-            <ListX aria-hidden className="size-4" />
-          )}
-        </button>
+      <DropdownMenu
+        triggerLabel={`Opciones de ${track.title}`}
+        trigger={<MoreHorizontal aria-hidden className="size-4" />}
+        items={menuItems}
+      />
+      {addToListOpen && (
+        <AddToPlaylistDialog track={track} onClose={() => setAddToListOpen(false)} />
       )}
     </div>
   )

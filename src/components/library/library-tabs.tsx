@@ -11,21 +11,23 @@ import {
   Mic2,
   Music2,
   Plus,
+  Shapes,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TrackListPaginated } from './track-list-paginated'
-import { AlbumCard, ArtistCard } from './cards'
+import { AlbumCard, ArtistCard, GenreCard } from './cards'
 import { PlaylistCard } from './playlist-card'
 import { TrackList } from './track-list'
 import { EmptyState } from '@/components/ui/spinner'
 import { PlaylistFormDialog } from '@/components/playlist/playlist-form-dialog'
 import type { LibraryTrack } from './track-row'
-import type { Album, Artist, Playlist } from '@/types/music'
+import type { Album, Artist, Genre, Playlist } from '@/types/music'
 
 const TABS = [
   { id: 'tracks', label: 'Canciones', icon: Music2 },
   { id: 'albums', label: 'Álbumes', icon: Disc3 },
   { id: 'artists', label: 'Artistas', icon: Mic2 },
+  { id: 'genres', label: 'Géneros', icon: Shapes },
   { id: 'playlists', label: 'Listas', icon: ListMusic },
   { id: 'favorites', label: 'Favoritas', icon: Heart },
 ] as const
@@ -39,6 +41,7 @@ interface Props {
   favoriteIds: Set<string>
   albums: Album[]
   artists: Artist[]
+  genres: Genre[]
   favoriteTracks: LibraryTrack[]
   playlists: Playlist[]
 }
@@ -49,6 +52,7 @@ export function LibraryTabs({
   favoriteIds,
   albums,
   artists,
+  genres,
   favoriteTracks,
   playlists,
 }: Props) {
@@ -118,6 +122,24 @@ export function LibraryTabs({
             <div className="flex flex-wrap gap-1">
               {artists.map((artist) => (
                 <ArtistCard key={artist.id} artist={artist} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'genres' && (
+        <>
+          {genres.length === 0 ? (
+            <EmptyState
+              icon={<Shapes className="size-10" />}
+              title="Sin géneros"
+              description="Los géneros aparecerán aquí cuando las canciones tengan uno asignado."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {genres.map((genre) => (
+                <GenreCard key={genre.id} genre={genre} />
               ))}
             </div>
           )}

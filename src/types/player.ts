@@ -3,7 +3,7 @@ import type { Track } from './music'
 export type RepeatMode = 'off' | 'all' | 'one'
 
 export interface QueueContext {
-  type: 'album' | 'playlist' | 'artist' | 'track' | 'favorites' | 'search' | 'discover' | 'queue'
+  type: 'album' | 'playlist' | 'artist' | 'track' | 'favorites' | 'search' | 'discover' | 'queue' | 'genre' | 'stats'
   id?: string
   title?: string
 }

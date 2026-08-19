@@ -26,9 +26,9 @@ export function decodeCursor(cursor: string): CursorPos | null {
 // Las consultas de texto usan ILIKE %…% (apoyadas en índices GIN trigram).
 
 const TRACK_SELECT =
-  'id, title, artist_id, album_id, genre_id, track_number, disc_number, duration_ms, audio_path, cover_url, lyrics, plays_count, added_at, artist:artist_id(name), artists:track_artists(position, artist:artist_id(id, name)), album:album_id(title, cover_url)'
+  'id, title, artist_id, album_id, genre_id, track_number, disc_number, duration_ms, audio_path, cover_url, lyrics, plays_count, added_at, artist:artist_id(name), artists:track_artists(position, artist:artist_id(id, name)), album:album_id(title, cover_url), genre:genre_id(name)'
 
-type TrackRow = Track & {
+export type TrackRow = Track & {
   artist: Artist | null
   artists: EmbeddedArtist[] | null
   album: Album | null
@@ -167,9 +167,55 @@ export async function getGenres(): Promise<Genre[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('genres')
-    .select('id, name')
+    .select('id, name, tracks(count)')
     .order('name', { ascending: true })
-  return (data ?? []) as Genre[]
+  return ((data ?? []) as { id: string; name: string; tracks: { count: number }[] }[]).map(
+    (g) => ({ id: g.id, name: g.name, track_count: g.tracks?.[0]?.count ?? 0 })
+  )
+}
+
+export interface GenreDetail {
+  genre: Genre
+  tracks: TrackRow[]
+  albums: Album[]
+}
+
+export async function getGenreDetail(genreId: string): Promise<GenreDetail | null> {
+  if (!isValidUUID(genreId)) return null
+  const supabase = await createClient()
+  const { data: genre } = await supabase
+    .from('genres')
+    .select('id, name, tracks(count)')
+    .eq('id', genreId)
+    .single()
+  if (!genre) return null
+
+  const { data } = await supabase
+    .from('tracks')
+    .select(TRACK_SELECT)
+    .eq('genre_id', genreId)
+    .order('plays_count', { ascending: false })
+    .order('added_at', { ascending: false })
+    .limit(200)
+  const tracks = rows(data)
+
+  // Álbumes del género: los de las canciones que lo componen.
+  const albumIds = [...new Set(tracks.map((t) => t.album_id).filter(Boolean))] as string[]
+  let albums: Album[] = []
+  if (albumIds.length > 0) {
+    const { data: albumRows } = await supabase
+      .from('albums')
+      .select('id, title, artist_id, release_year, cover_url, created_at, artist:artist_id(name)')
+      .in('id', albumIds)
+      .order('title', { ascending: true })
+    albums = (albumRows ?? []) as Album[]
+  }
+
+  return {
+    genre: { id: genre.id, name: genre.name, track_count: genre.tracks?.[0]?.count ?? tracks.length },
+    tracks,
+    albums,
+  }
 }
 
 export interface AlbumDetail {
