@@ -72,6 +72,12 @@ export type TrackRow = {
   updated_at: string
 }
 
+export type TrackArtistRow = {
+  track_id: string
+  artist_id: string
+  position: number
+}
+
 export type PlaylistRow = {
   id: string
   owner_id: string
@@ -186,6 +192,10 @@ export type Database = {
         Relationship<'artists', ['artist_id']>,
         Relationship<'albums', ['album_id']>,
         Relationship<'genres', ['genre_id']>,
+      ]>
+      track_artists: TableDef<TrackArtistRow, Partial<TrackArtistRow>, Partial<TrackArtistRow>, [
+        Relationship<'tracks', ['track_id']>,
+        Relationship<'artists', ['artist_id']>,
       ]>
       playlists: TableDef<PlaylistRow, Partial<PlaylistRow>, Partial<PlaylistRow>, [
         Relationship<'profiles', ['owner_id']>,

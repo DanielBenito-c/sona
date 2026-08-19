@@ -1,6 +1,6 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
-import type { Album, Artist, Genre, Playlist, Track } from '@/types/music'
+import type { Album, Artist, EmbeddedArtist, Genre, Playlist, Track } from '@/types/music'
 import { isValidUUID } from '@/lib/utils'
 
 interface CursorPos {
@@ -26,19 +26,44 @@ export function decodeCursor(cursor: string): CursorPos | null {
 // Las consultas de texto usan ILIKE %…% (apoyadas en índices GIN trigram).
 
 const TRACK_SELECT =
-  'id, title, artist_id, album_id, genre_id, track_number, disc_number, duration_ms, audio_path, cover_url, lyrics, plays_count, added_at, artist:artist_id(name), album:album_id(title, cover_url)'
+  'id, title, artist_id, album_id, genre_id, track_number, disc_number, duration_ms, audio_path, cover_url, lyrics, plays_count, added_at, artist:artist_id(name), artists:track_artists(position, artist:artist_id(id, name)), album:album_id(title, cover_url)'
 
-type TrackRow = Track & { artist: Artist | null; album: Album | null }
+type TrackRow = Track & {
+  artist: Artist | null
+  artists: EmbeddedArtist[] | null
+  album: Album | null
+}
 
-export async function getTracksByIds(ids: string[]): Promise<TrackRow[]> {
+// Convierte una fila cruda del select a TrackRow normalizando el embed de
+// track_artists ({position, artist}) en una lista de artistas ordenada.
+function toTrackRow(raw: Record<string, unknown>): TrackRow {
+  const { artist, artists, album, ...rest } = raw
+  const rawArtists = artists as
+    | { position: number; artist: EmbeddedArtist }[]
+    | null
+    | undefined
+  return {
+    ...(rest as unknown as Track),
+    artist: (artist as Artist) ?? null,
+    artists:
+      rawArtists?.slice().sort((a, b) => a.position - b.position).map((a) => a.artist) ?? null,
+    album: (album as Album) ?? null,
+  }
+}
+
+function rows(data: readonly unknown[] | null | undefined): TrackRow[] {
+  return (data ?? []).map((d) => toTrackRow(d as Record<string, unknown>))
+}
+
+export async function getTracksByIds(ids: string[], limit = 100): Promise<TrackRow[]> {
   if (ids.length === 0) return []
   const supabase = await createClient()
   const { data } = await supabase
     .from('tracks')
     .select(TRACK_SELECT)
     .in('id', ids)
-    .limit(100)
-  return (data ?? []) as TrackRow[]
+    .limit(limit)
+  return rows(data)
 }
 
 // Resuelve una lista polimórfica (recently_played / favorites) a tracks.
@@ -93,7 +118,7 @@ export async function getNewTracks(limit = 12): Promise<TrackRow[]> {
     .select(TRACK_SELECT)
     .order('added_at', { ascending: false })
     .limit(limit)
-  return (data ?? []) as TrackRow[]
+  return rows(data)
 }
 
 export async function getTopTracks(limit = 12): Promise<TrackRow[]> {
@@ -104,7 +129,7 @@ export async function getTopTracks(limit = 12): Promise<TrackRow[]> {
     .order('plays_count', { ascending: false })
     .order('added_at', { ascending: false })
     .limit(limit)
-  return (data ?? []) as TrackRow[]
+  return rows(data)
 }
 
 export async function getNewAlbums(limit = 12): Promise<Album[]> {
@@ -152,6 +177,71 @@ export interface AlbumDetail {
   tracks: TrackRow[]
 }
 
+// ---- Playlists --------------------------------------------------------
+
+export interface PlaylistDetail {
+  playlist: Playlist
+  tracks: TrackRow[]
+  track_count: number
+  total_duration_ms: number
+  is_owner: boolean
+}
+
+export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('playlists')
+    .select(
+      'id, owner_id, name, description, cover_url, is_public, created_at, updated_at, tracks:playlist_tracks(track:track_id(duration_ms))'
+    )
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false })
+  return (data ?? []).map((p) => {
+    const tracks = (p.tracks ?? []) as { track: { duration_ms: number } | null }[]
+    return {
+      ...p,
+      track_count: tracks.length,
+      total_duration_ms: tracks.reduce((acc, t) => acc + (t.track?.duration_ms ?? 0), 0),
+    } as Playlist
+  })
+}
+
+export async function getPlaylistDetail(
+  playlistId: string,
+  userId: string
+): Promise<PlaylistDetail | null> {
+  if (!isValidUUID(playlistId)) return null
+  const supabase = await createClient()
+  const { data: playlist } = await supabase
+    .from('playlists')
+    .select(
+      'id, owner_id, name, description, cover_url, is_public, created_at, updated_at, owner:owner_id(username, full_name)'
+    )
+    .eq('id', playlistId)
+    .maybeSingle()
+  if (!playlist) return null
+
+  const { data: links } = await supabase
+    .from('playlist_tracks')
+    .select('track_id, position')
+    .eq('playlist_id', playlistId)
+    .order('position', { ascending: true })
+    .limit(500)
+
+  const trackIds = (links ?? []).map((l) => l.track_id)
+  const tracks = await getTracksByIds(trackIds, 500)
+  const pos = new Map((links ?? []).map((l) => [l.track_id, l.position]))
+  tracks.sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0))
+
+  return {
+    playlist: playlist as Playlist,
+    tracks,
+    track_count: trackIds.length,
+    total_duration_ms: tracks.reduce((acc, t) => acc + t.duration_ms, 0),
+    is_owner: playlist.owner_id === userId,
+  }
+}
+
 export async function getAlbumDetail(albumId: string): Promise<AlbumDetail | null> {
   if (!isValidUUID(albumId)) return null
   const supabase = await createClient()
@@ -167,7 +257,7 @@ export async function getAlbumDetail(albumId: string): Promise<AlbumDetail | nul
     .eq('album_id', albumId)
     .order('disc_number', { ascending: true })
     .order('track_number', { ascending: true })
-  return { album: album as Album, tracks: (tracks ?? []) as TrackRow[] }
+  return { album: album as Album, tracks: rows(tracks) }
 }
 
 export interface ArtistDetail {
@@ -186,13 +276,15 @@ export async function getArtistDetail(artistId: string): Promise<ArtistDetail | 
     .maybeSingle()
   if (!artist) return null
   const albums = await getAlbumsByArtist(artistId)
-  const { data: tracks } = await supabase
-    .from('tracks')
-    .select(TRACK_SELECT)
+  const { data: links } = await supabase
+    .from('track_artists')
+    .select('track_id')
     .eq('artist_id', artistId)
-    .order('plays_count', { ascending: false })
-    .limit(50)
-  return { artist: artist as Artist, albums, tracks: (tracks ?? []) as TrackRow[] }
+    .limit(100)
+  const trackIds = (links ?? []).map((l) => l.track_id)
+  const tracks = await getTracksByIds(trackIds)
+  tracks.sort((a, b) => (b.plays_count ?? 0) - (a.plays_count ?? 0))
+  return { artist: artist as Artist, albums, tracks }
 }
 
 // ---- Búsqueda ---------------------------------------------------------
@@ -227,7 +319,7 @@ export async function searchLibrary(
 
   async function fetchTracks(builder: PromiseLike<BuilderResult>) {
     const { data, error } = await builder
-    tracks = (data ?? []) as TrackRow[]
+    tracks = rows(data)
     if (tracks.length === clamped) {
       const last = tracks[tracks.length - 1]
       nextCursor = encodeCursor(last.added_at ?? '', last.id)

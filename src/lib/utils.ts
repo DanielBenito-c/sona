@@ -38,3 +38,16 @@ export function formatPlayCount(n: number): string {
 export function isValidUUID(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
+
+// Nombres de todos los artistas de una canción en orden de aparición
+// ("Flo Rida, T-pain"). Usa el embed normalizado de track_artists si está
+// presente y cae al artista principal en otro caso.
+export function formatArtists(track: {
+  artists?: { id: string; name: string }[] | null
+  artist?: { name?: string } | null
+} | null): string {
+  if (!track) return 'Artista desconocido'
+  const names = track.artists?.map((a) => a.name).filter(Boolean)
+  if (names && names.length > 0) return names.join(', ')
+  return track.artist?.name ?? 'Artista desconocido'
+}

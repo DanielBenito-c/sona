@@ -44,12 +44,18 @@ export interface Track {
   custom_metadata?: Record<string, unknown>
   plays_count?: number
   added_at?: string
-  // Relaciones opcionales (joins de Supabase)
   artist?: Artist | null
+  /** Todos los artistas de la canción (embeds vía track_artists). */
+  artists?: EmbeddedArtist[] | null
   album?: Album | null
   genre?: Genre | null
-  // Flags calculados en queries del usuario actual
   is_favorite?: boolean
+}
+
+/** Artista embebido en una canción (solo id + nombre). */
+export interface EmbeddedArtist {
+  id: string
+  name: string
 }
 
 export interface PlaylistTrack {

@@ -13,9 +13,18 @@ interface Props {
   context?: QueueContext
   showAlbum?: boolean
   emptyMessage?: string
+  /** Muestra botón para quitar canciones (playlists propias). */
+  onRemove?: (trackId: string) => void
 }
 
-export function TrackList({ tracks, favoriteIds, context, showAlbum, emptyMessage }: Props) {
+export function TrackList({
+  tracks,
+  favoriteIds,
+  context,
+  showAlbum,
+  emptyMessage,
+  onRemove,
+}: Props) {
   const player = usePlayer()
 
   if (tracks.length === 0) {
@@ -41,6 +50,7 @@ export function TrackList({ tracks, favoriteIds, context, showAlbum, emptyMessag
           onPlay={handlePlay}
           context={context}
           showAlbum={showAlbum}
+          onRemove={onRemove}
         />
       ))}
     </div>

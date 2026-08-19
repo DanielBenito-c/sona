@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Heart, Loader2, Pause, Play } from 'lucide-react'
+import { Heart, ListX, Loader2, Pause, Play } from 'lucide-react'
 import { getBrowserClient } from '@/lib/supabase/client'
 import { usePlayer } from '@/contexts/player-provider'
-import { cn, formatDuration } from '@/lib/utils'
+import { cn, formatArtists, formatDuration } from '@/lib/utils'
 import { Cover } from './cover'
 import type { Album, Artist, Track } from '@/types/music'
 import type { QueueContext } from '@/types/player'
@@ -22,6 +22,8 @@ interface Props {
   list?: LibraryTrack[]
   context?: QueueContext
   showAlbum?: boolean
+  /** Muestra un botón para quitar la canción (p. ej. desde una playlist). */
+  onRemove?: (trackId: string) => void
 }
 
 export function TrackRow({
@@ -32,9 +34,11 @@ export function TrackRow({
   list,
   context,
   showAlbum = true,
+  onRemove,
 }: Props) {
   const [fav, setFav] = useState(isFavorite)
   const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const player = usePlayer()
   const isCurrent = player.current?.id === track.id
   const isCurrentPlaying = isCurrent && player.isPlaying
@@ -98,7 +102,7 @@ export function TrackRow({
           {track.title}
         </p>
         <p className="truncate text-xs text-muted">
-          {track.artist?.name ?? 'Artista desconocido'}
+          {formatArtists(track)}
           {showAlbum && track.album?.title && (
             <>
               {' · '}
@@ -128,6 +132,24 @@ export function TrackRow({
           className={cn('size-4 transition-colors', fav && 'fill-accent text-accent')}
         />
       </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={() => {
+            setRemoving(true)
+            onRemove(track.id)
+          }}
+          disabled={removing}
+          aria-label={`Quitar ${track.title} de la lista`}
+          className="rounded-full p-2 text-muted transition-colors hover:text-foreground disabled:opacity-40"
+        >
+          {removing ? (
+            <Loader2 aria-hidden className="size-4 animate-spin" />
+          ) : (
+            <ListX aria-hidden className="size-4" />
+          )}
+        </button>
+      )}
     </div>
   )
 }

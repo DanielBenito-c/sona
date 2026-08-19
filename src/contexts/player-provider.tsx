@@ -10,6 +10,7 @@ import {
   useRef,
 } from 'react'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { formatArtists } from '@/lib/utils'
 import type { Track } from '@/types/music'
 import type { QueueContext, RepeatMode } from '@/types/player'
 
@@ -168,17 +169,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (trackIds.length > 0) {
         const { data: tracks } = await supabase
           .from('tracks')
-          .select('*, artist:artist_id(name), album:album_id(title, cover_url)')
+          .select('*, artist:artist_id(name), artists:track_artists(position, artist:artist_id(id, name)), album:album_id(title, cover_url)')
           .in('id', trackIds)
         const byId = new Map((tracks ?? []).map((t) => [t.id, t]))
         const queue = trackIds
           .map((id) => byId.get(id))
           .filter((t): t is NonNullable<typeof t> => Boolean(t))
-          .map((t) => ({
-            ...t,
-            artist: (t as { artist?: { name: string } | null }).artist ?? null,
-            album: (t as { album?: { title: string; cover_url: string | null } | null }).album ?? null,
-          })) as unknown as Track[]
+          .map((t) => {
+            const raw = t as unknown as {
+              artist?: { name: string } | null
+              artists?: { position: number; artist: { id: string; name: string } }[] | null
+              album?: { title: string; cover_url: string | null } | null
+            }
+            return {
+              ...t,
+              artist: raw.artist ?? null,
+              artists:
+                raw.artists?.slice().sort((a, b) => a.position - b.position).map((a) => a.artist) ?? null,
+              album: raw.album ?? null,
+            } as unknown as Track
+          })
         const ctx = (queueRows.data?.[0]?.context ?? null) as QueueContext | null
         dispatch({
           type: 'SET_QUEUE',
@@ -392,7 +402,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
     if (!currentTrack) return
-    const artistName = currentTrack.artist?.name ?? 'Artista desconocido'
+    const artistName = formatArtists(currentTrack)
     const albumTitle = currentTrack.album?.title
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,

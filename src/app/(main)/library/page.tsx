@@ -4,6 +4,7 @@ import {
   getArtists,
   getFavoriteTracks,
   getNewAlbums,
+  getUserPlaylists,
   searchLibrary,
 } from '@/lib/library'
 import { LibraryTabs } from '@/components/library/library-tabs'
@@ -15,11 +16,12 @@ export const metadata: Metadata = {
 export default async function LibraryPage() {
   const user = await requireUser()
 
-  const [tracks, albums, artists, favorites] = await Promise.all([
+  const [tracks, albums, artists, favorites, playlists] = await Promise.all([
     searchLibrary(user.id, '', null, 60),
     getNewAlbums(100),
     getArtists(100),
     getFavoriteTracks(user.id, 100),
+    getUserPlaylists(user.id),
   ])
 
   return (
@@ -36,6 +38,7 @@ export default async function LibraryPage() {
         albums={albums}
         artists={artists}
         favoriteTracks={favorites}
+        playlists={playlists}
       />
     </div>
   )

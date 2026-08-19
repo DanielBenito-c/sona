@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ChevronUp, Loader2, Pause, Play } from 'lucide-react'
 import { usePlayer } from '@/contexts/player-provider'
 import { Cover } from '@/components/library/cover'
-import { cn, formatDuration } from '@/lib/utils'
+import { cn, formatArtists, formatDuration } from '@/lib/utils'
 import { ExpandedPlayer } from './expanded-player'
 
 // Barra del reproductor (compacta). Vive sobre la bottom nav en móvil y
@@ -56,7 +56,7 @@ export function PlayerBar() {
                   {current?.title ?? 'Nada sonando'}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {current?.artist?.name ?? (hasTrack ? 'Artista desconocido' : 'Toca play en una canción')}
+                  {formatArtists(current) ?? (hasTrack ? 'Artista desconocido' : 'Toca play en una canción')}
                 </p>
               </div>
             </button>

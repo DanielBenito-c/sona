@@ -3,7 +3,7 @@
 import { ListMusic, Pause, Play, Trash2 } from 'lucide-react'
 import { usePlayer } from '@/contexts/player-provider'
 import { Cover } from '@/components/library/cover'
-import { cn } from '@/lib/utils'
+import { cn, formatArtists } from '@/lib/utils'
 
 export default function QueuePage() {
   const {
@@ -85,7 +85,7 @@ export default function QueuePage() {
                   {track.title}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {track.artist?.name ?? 'Artista desconocido'}
+                  {formatArtists(track)}
                   {track.album?.title ? ` · ${track.album.title}` : ''}
                 </p>
               </div>

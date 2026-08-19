@@ -1,20 +1,32 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Disc3, Heart, Library as LibraryIcon, Mic2, Music2 } from 'lucide-react'
+import {
+  Disc3,
+  Heart,
+  Library as LibraryIcon,
+  ListMusic,
+  Mic2,
+  Music2,
+  Plus,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TrackListPaginated } from './track-list-paginated'
 import { AlbumCard, ArtistCard } from './cards'
+import { PlaylistCard } from './playlist-card'
 import { TrackList } from './track-list'
 import { EmptyState } from '@/components/ui/spinner'
+import { PlaylistFormDialog } from '@/components/playlist/playlist-form-dialog'
 import type { LibraryTrack } from './track-row'
-import type { Album, Artist } from '@/types/music'
+import type { Album, Artist, Playlist } from '@/types/music'
 
 const TABS = [
   { id: 'tracks', label: 'Canciones', icon: Music2 },
   { id: 'albums', label: 'Álbumes', icon: Disc3 },
   { id: 'artists', label: 'Artistas', icon: Mic2 },
+  { id: 'playlists', label: 'Listas', icon: ListMusic },
   { id: 'favorites', label: 'Favoritas', icon: Heart },
 ] as const
 
@@ -28,6 +40,7 @@ interface Props {
   albums: Album[]
   artists: Artist[]
   favoriteTracks: LibraryTrack[]
+  playlists: Playlist[]
 }
 
 export function LibraryTabs({
@@ -37,8 +50,11 @@ export function LibraryTabs({
   albums,
   artists,
   favoriteTracks,
+  playlists,
 }: Props) {
   const [tab, setTab] = useState<TabId>('tracks')
+  const [createOpen, setCreateOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <div className="flex flex-col gap-5">
@@ -108,6 +124,36 @@ export function LibraryTabs({
         </>
       )}
 
+      {tab === 'playlists' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted">{playlists.length} listas</p>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <Plus aria-hidden className="size-4" />
+              Nueva lista
+            </button>
+          </div>
+
+          {playlists.length === 0 ? (
+            <EmptyState
+              icon={<ListMusic className="size-10" />}
+              title="Sin listas todavía"
+              description="Crea tu primera lista con tus canciones favoritas."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {playlists.map((playlist) => (
+                <PlaylistCard key={playlist.id} playlist={playlist} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'favorites' && (
         <>
           {favoriteTracks.length === 0 ? (
@@ -132,6 +178,17 @@ export function LibraryTabs({
             </div>
           )}
         </>
+      )}
+
+      {createOpen && (
+        <PlaylistFormDialog
+          onClose={() => setCreateOpen(false)}
+          onSaved={() => {
+            setCreateOpen(false)
+            router.refresh()
+          }}
+          mode="create"
+        />
       )}
     </div>
   )

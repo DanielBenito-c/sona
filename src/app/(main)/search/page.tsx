@@ -217,7 +217,7 @@ export default function SearchPage() {
             {results.playlists.map((playlist) => (
               <Link
                 key={playlist.id}
-                href="#"
+                href={`/playlist/${playlist.id}`}
                 className="rounded-xl border border-border bg-surface/50 px-4 py-3 transition-colors hover:border-accent/60"
               >
                 <p className="truncate text-sm font-medium">{playlist.name}</p>

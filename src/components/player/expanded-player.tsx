@@ -18,7 +18,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react'
-import { cn, formatDuration } from '@/lib/utils'
+import { cn, formatArtists, formatDuration } from '@/lib/utils'
 import type { RepeatMode } from '@/types/player'
 
 // Reproductor expandido: pantalla completa en móvil, panel lateral en
@@ -88,7 +88,7 @@ export function ExpandedPlayer({ open, onClose }: { open: boolean; onClose: () =
           <div className="w-full text-center">
             <h2 className="truncate text-lg font-bold">{current.title}</h2>
             <p className="truncate text-sm text-muted">
-              {current.artist?.name ?? 'Artista desconocido'}
+              {formatArtists(current)}
               {current.album?.title ? ` · ${current.album.title}` : ''}
             </p>
           </div>
@@ -258,7 +258,7 @@ export function ExpandedPlayer({ open, onClose }: { open: boolean; onClose: () =
                       {track.title}
                     </p>
                     <p className="truncate text-xs text-muted">
-                      {track.artist?.name ?? 'Artista desconocido'}
+                      {formatArtists(track)}
                     </p>
                   </div>
                   <button

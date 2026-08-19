@@ -26,6 +26,26 @@ const MAX_SIZE = 100 * 1024 * 1024 // 100 MB (coincide con el bucket)
 
 type AdminClient = SupabaseClient<Database>
 
+// Separa un campo de artista con varios nombres ("Flo Rida, T-pain",
+// "Shakira feat. Anuel AA", "Lil Nas X (feat. Billy Ray Cyrus)").
+// Conservadores con "/" y "+" para no romper bandas tipo "AC/DC".
+const ARTIST_SEPARATOR =
+  /\s*(?:,|&|\bfeaturing\b|\bfeat\.?|\bft\.?|\bwith\b|\by\b)\s*/gi
+const FEAT_PARENS = /\((?:feat\.?|ft\.?|featuring|with)\s*:?\s*([^)]+)\)/gi
+
+export function splitArtistNames(raw: string): string[] {
+  const cleaned = raw.replace(FEAT_PARENS, ', $1')
+  const seen = new Set<string>()
+  const parts: string[] = []
+  for (const part of cleaned.split(ARTIST_SEPARATOR)) {
+    const p = part.trim()
+    if (!p || seen.has(p.toLowerCase())) continue
+    seen.add(p.toLowerCase())
+    parts.push(p)
+  }
+  return parts.length > 0 ? parts : [raw.trim() || 'Artista desconocido']
+}
+
 // Busca o crea una fila por un campo único. NO usa ON CONFLICT, que
 // exigiría constraints exactos en la BD; si otra petición crea la fila
 // entre medias (23505), se re-consulta y se devuelve la existente.
@@ -112,7 +132,7 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
 
   const cover = common.picture?.[0]
 
-  // --- 3. Buscar o crear genre / artist / album ---------------------------
+  // --- 3. Buscar o crear genre / artists / album ---------------------------
   let genreId: string | null = null
   if (genreName) {
     const { row } = await findOrCreate<{ id: string }>(
@@ -124,15 +144,26 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
     genreId = row?.id ?? null
   }
 
-  const { row: artist, error: artistErr } = await findOrCreate<{ id: string }>(
-    admin,
-    'artists',
-    { eq: [['name', artistName]] },
-    { name: artistName }
-  )
-  if (artistErr || !artist) {
-    return { ok: false, status: 'error', message: `No se pudo crear el artista: ${artistErr?.message ?? '?'}` }
+  // Varios artistas posibles ("Flo Rida, T-pain" → Flo Rida + T-pain).
+  // El primero es el principal (tracks.artist_id); el resto se enlaza
+  // vía track_artists.
+  const artistNames = splitArtistNames(artistName)
+  const artistIds: string[] = []
+  for (const name of artistNames) {
+    const { row: a, error: aErr } = await findOrCreate<{ id: string }>(
+      admin,
+      'artists',
+      { eq: [['name', name]] },
+      { name }
+    )
+    if (aErr || !a) {
+      return { ok: false, status: 'error', message: `No se pudo crear el artista: ${aErr?.message ?? '?'}` }
+    }
+    artistIds.push(a.id)
   }
+
+  const artist = { id: artistIds[0] }
+  const allArtistNames = artistNames.join(', ')
 
   let albumId: string | null = null
   let albumCover: string | null = null
@@ -183,7 +214,7 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
       duration_ms: durationMs,
       audio_path: req.path,
       cover_url: albumCover,
-      search_text: [title, artistName, albumTitle].filter(Boolean).join(' ').toLowerCase(),
+      search_text: [title, allArtistNames, albumTitle].filter(Boolean).join(' ').toLowerCase(),
       custom_metadata: {
         file_sha256: req.sha256.toLowerCase(),
         filename: req.filename,
@@ -206,6 +237,13 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
     return { ok: false, status: 'error', message: `No se pudo crear la canción: ${trackErr.message}` }
   }
 
+  // Enlaza todos los artistas con la canción.
+  if (artistIds.length > 1) {
+    await admin.from('track_artists').insert(
+      artistIds.map((id, i) => ({ track_id: track.id, artist_id: id, position: i + 1 }))
+    )
+  }
+
   await admin.from('uploads').insert({
     user_id: userId,
     filename: req.filename,
@@ -219,6 +257,6 @@ export async function importTrackFile(req: ImportRequest, userId: string): Promi
     ok: true,
     status: 'created',
     message: `«${title}» importada`,
-    track: { id: track.id, title, artist: artistName, album: albumTitle || null, durationMs },
+    track: { id: track.id, title, artist: allArtistNames, album: albumTitle || null, durationMs },
   }
 }
